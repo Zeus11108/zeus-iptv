@@ -1,0 +1,25 @@
+{
+  "name": "ZEUS IPTV Portal",
+  "version": "0.1.0",
+  "type": "pages",
+  "headline": "ZEUS IPTV",
+  "background": "",
+  "template": {
+    "type": "button",
+    "layout": "1,1,10,4",
+    "icon": "play-circle-outline",
+    "iconSize": "extra-large",
+    "color": "msx-black-soft",
+    "title": "ZEUS IPTV",
+    "text": "Open your personal IPTV player",
+    "alignment": "center",
+    "action": "link:https://Zeus11108.github.io/zeus-iptv/"
+  },
+  "items": [
+    {
+      "id": "open-zeus",
+      "label": "OPEN ZEUS IPTV",
+      "focus": true
+    }
+  ]
+}

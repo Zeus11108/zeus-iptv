@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZEUS IPTV</title>
+<style>
+:root{--bg:#08090c;--panel:#12151b;--gold:#d7ad55;--gold2:#f1d28a;--muted:#9da3ad;--line:#292d35}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% 0%,#302514 0%,#111216 35%,var(--bg) 72%);color:#f5f5f5;font:16px Arial,sans-serif;min-height:100vh}
+header{padding:26px 5vw 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #29251d}
+.brand{font-size:clamp(24px,4vw,42px);font-weight:900;letter-spacing:3px;color:var(--gold2)}.brand span{color:#fff}
+.pill{color:var(--muted);font-size:13px}
+main{max-width:1400px;margin:auto;padding:32px 5vw}
+h1{font-size:clamp(25px,4vw,42px);margin:0 0 8px}.sub{color:var(--muted);margin:0 0 26px}
+.panel{background:linear-gradient(145deg,#171a21,#0e1015);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 18px 55px #0008}
+form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.wide{grid-column:1/-1}
+label{display:block;color:var(--gold2);font-size:13px;margin:0 0 7px}
+input{width:100%;background:#090b0f;color:white;border:1px solid #343943;border-radius:10px;padding:14px;font-size:16px;outline:none}
+input:focus{border-color:var(--gold)}
+button{background:linear-gradient(135deg,var(--gold2),#b8862d);border:0;border-radius:10px;padding:14px 20px;font-weight:800;font-size:15px;color:#17120a;cursor:pointer}
+button.secondary{background:#242832;color:#eee;border:1px solid #3a3f49}
+.status{margin-top:14px;color:var(--muted);min-height:22px}.hidden{display:none!important}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}.toolbar button{background:#171a20;color:#ddd;border:1px solid var(--line)}.toolbar button.active{border-color:var(--gold);color:var(--gold2)}
+.layout{display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:20px}
+.sidebar,.results{background:#101319;border:1px solid var(--line);border-radius:16px;padding:18px;min-height:300px}
+.sidebar h3,.results h3{color:var(--gold2);margin:0 0 14px}
+.category{display:block;width:100%;text-align:left;margin:7px 0;background:#1a1e26;color:#eee;border:1px solid #2c323c}
+.category.selected{border-color:var(--gold);color:var(--gold2)}
+.channel{width:100%;text-align:left;background:#181c23;color:#fff;border:1px solid #2a3039;margin:7px 0;display:flex;justify-content:space-between;gap:12px}
+.channel small{color:var(--muted)}
+#player{width:100%;max-height:55vh;background:#000;border-radius:12px;margin:12px 0}
+.note{font-size:12px;color:#818894;line-height:1.6;margin-top:20px}
+@media(max-width:720px){form{grid-template-columns:1fr}.layout{grid-template-columns:1fr}.wide{grid-column:auto}header{padding:18px 5vw}main{padding-top:22px}}
+</style>
+</head>
+<body>
+<header><div class="brand">ZEUS<span> IPTV</span></div><div class="pill">PERSONAL MEDIA PLAYER</div></header>
+<main>
+<section id="login">
+  <h1>Your screen. Your channels.</h1><p class="sub">Connect your own IPTV subscription using Xtream Codes.</p>
+  <div class="panel">
+    <form id="loginForm">
+      <div class="wide"><label for="server">SERVER URL</label><input id="server" type="url" placeholder="https://provider.example:port" required autocomplete="url"></div>
+      <div><label for="username">USERNAME</label><input id="username" required autocomplete="username"></div>
+      <div><label for="password">PASSWORD</label><input id="password" type="password" required autocomplete="current-password"></div>
+      <div class="wide"><button type="submit">CONNECT</button></div>
+    </form>
+    <div id="status" class="status" role="status"></div>
+  </div>
+  <p class="note">Use only a subscription and streams you are authorized to access. Credentials are kept in this browser session only and are not sent to ZEUS servers.</p>
+</section>
+<section id="dashboard" class="hidden">
+  <h1>Welcome to ZEUS</h1><p class="sub" id="accountInfo"></p>
+  <div class="toolbar">
+    <button class="active" data-kind="live">LIVE TV</button><button data-kind="movie">MOVIES</button><button data-kind="series">SERIES</button>
+    <button class="secondary" id="logout">DISCONNECT</button>
+  </div>
+  <div class="layout">
+    <aside class="sidebar"><h3> CATEGORIES </h3><div id="categories"></div></aside>
+    <section class="results"><h3 id="listTitle">CHANNELS</h3><video id="player" controls playsinline></video><div id="items">Choose a category.</div></section>
+  </div>
+</section>
+</main>
+<script>
+(() => {
+ const $=id=>document.getElementById(id);
+ let cfg=null, kind='live', activeCategory=null, allCategories=[], allItems=[];
+ const cleanServer=s=>s.trim().replace(/\/+$/,'');
+ const api=async(params)=>{
+   const u=new URL(cfg.server+'/player_api.php');
+   u.searchParams.set('username',cfg.username);u.searchParams.set('password',cfg.password);
+   Object.entries(params||{}).forEach(([k,v])=>u.searchParams.set(k,v));
+   const r=await fetch(u.toString()); if(!r.ok) throw new Error('Server returned HTTP '+r.status);
+   return await r.json();
+ };
+ const setStatus=t=>$('status').textContent=t;
+ $('loginForm').addEventListener('submit',async e=>{
+   e.preventDefault(); cfg={server:cleanServer($('server').value),username:$('username').value.trim(),password:$('password').value};
+   if(!/^https?:\/\//i.test(cfg.server)){setStatus('Enter a full server URL beginning with http:// or https://');return}
+   setStatus('Connecting…');
+   try{
+     const info=await api({});
+     if(!info||!info.user_info) throw new Error('Login was not accepted. Check the server URL and account details.');
+     $('accountInfo').textContent='Connected • '+(info.user_info.username||cfg.username);
+     $('login').classList.add('hidden');$('dashboard').classList.remove('hidden');
+     await loadKind('live');
+   }catch(err){cfg=null;setStatus(err.message+' If this is a CORS error, the provider may not allow browser-based connections.')}
+ });
+ async function loadKind(k){
+   kind=k;activeCategory=null;
+   document.querySelectorAll('[data-kind]').forEach(b=>b.classList.toggle('active',b.dataset.kind===k));
+   $('listTitle').textContent=k==='live'?'LIVE CHANNELS':k==='movie'?'MOVIES':'SERIES';
+   $('categories').innerHTML='Loading…';$('items').innerHTML='Loading…';
+   $('player').classList.add('hidden');$('player').pause();$('player').removeAttribute('src');
+   try{
+     const action=k==='live'?'get_live_categories':k==='movie'?'get_vod_categories':'get_series_categories';
+     allCategories=await api({action}); renderCategories();
+   }catch(err){$('categories').textContent='Could not load categories';$('items').textContent=err.message}
+ }
+ function renderCategories(){
+   $('categories').innerHTML='';
+   allCategories.forEach(c=>{
+     const b=document.createElement('button');b.className='category';b.textContent=c.category_name;
+     b.onclick=()=>loadItems(c.category_id,b);$('categories').appendChild(b);
+   });
+ }
+ async function loadItems(id,button){
+   activeCategory=id;document.querySelectorAll('.category').forEach(b=>b.classList.remove('selected'));button.classList.add('selected');
+   $('items').textContent='Loading…';
+   try{
+     const action=kind==='live'?'get_live_streams':kind==='movie'?'get_vod_streams':'get_series';
+     allItems=await api({action,category_id:id});$('items').innerHTML='';
+     allItems.forEach(item=>{
+       const b=document.createElement('button');b.className='channel';
+       const name=document.createElement('span');name.textContent=item.name||item.title||'Untitled';
+       const meta=document.createElement('small');meta.textContent=kind==='live'?'PLAY':kind==='movie'?'MOVIE':'SERIES';
+       b.append(name,meta);b.onclick=()=>play(item);$('items').appendChild(b);
+     });
+     if(!allItems.length)$('items').textContent='No items in this category.';
+   }catch(err){$('items').textContent='Could not load items: '+err.message}
+ }
+ function play(item){
+   if(kind==='series'){ $('items').textContent='Series episodes need a season-selection screen. We will add that in the next build.';return}
+   const ext=kind==='live'?'m3u8':'mp4';
+   const url=cfg.server+'/'+(kind==='live'?'live':'movie')+'/'+encodeURIComponent(cfg.username)+'/'+encodeURIComponent(cfg.password)+'/'+item.stream_id+'.'+ext;
+   const v=$('player');v.classList.remove('hidden');v.src=url;v.play().catch(()=>{});
+ }
+ document.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click',()=>loadKind(b.dataset.kind)));
+ $('logout').onclick=()=>{cfg=null;$('dashboard').classList.add('hidden');$('login').classList.remove('hidden');$('loginForm').reset();setStatus('Disconnected. Credentials cleared from this session.');$('player').pause();};
+})();
+</script>
+</body>
+</html>
